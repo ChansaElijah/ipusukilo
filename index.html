@@ -492,7 +492,7 @@
                     </div>
                     <div style="margin-top:16px;">
                         <div class="grid-3">
-                            <div class="field"><label><i class="fas fa-graduation-cap"></i> Grade</label><select id="newClassGrade"><option value="">Select</option><option value="Form1">Form 1</option><option value="Form2">Form 2</option><option value="Grade10">Grade 10</option><option value="Grade11">Grade 11</option><option value="Grade12">Grade 12</option></select></div>
+                            <div class="field"><label><i class="fas fa-graduation-cap"></i> Grade</label><select id="newClassGrade"><option value="">Select</option><option value="Form1">Form 1</option><option value="Form2">Form 2</option><option value="Form3">Form 3</option><option value="Form4">Form 4</option><option value="Grade10">Grade 10</option><option value="Grade11">Grade 11</option><option value="Grade12">Grade 12</option></select></div>
                             <div class="field"><label><i class="fas fa-layer-group"></i> Stream</label><select id="newClassStream"><option value="">Select</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select></div>
                         </div>
                         <button class="btn btn-success btn-block" id="addClassBtn"><i class="fas fa-plus"></i> Add Class</button>
@@ -513,11 +513,21 @@
         const SUPABASE_URL = 'https://injvpbahfqltozrsqcmc.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImluanZwYmFoZnFsdG96cnNxY21jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDM0MzIsImV4cCI6MjEwMzQ3OTQzMn0.JoGibO2fqrw7sbmBbQ55EUKONQl94cqPTmkqxNoiXXk';
 
+        /* ===== 7 grades × 4 streams (A,B,C,D) = 28 classes ===== */
         const CLASS_DEFINITIONS = [
+            /* Form 1 */
             { id: 'Form1_A', display: 'Form 1 A' }, { id: 'Form1_B', display: 'Form 1 B' }, { id: 'Form1_C', display: 'Form 1 C' }, { id: 'Form1_D', display: 'Form 1 D' },
+            /* Form 2 */
             { id: 'Form2_A', display: 'Form 2 A' }, { id: 'Form2_B', display: 'Form 2 B' }, { id: 'Form2_C', display: 'Form 2 C' }, { id: 'Form2_D', display: 'Form 2 D' },
+            /* Form 3 */
+            { id: 'Form3_A', display: 'Form 3 A' }, { id: 'Form3_B', display: 'Form 3 B' }, { id: 'Form3_C', display: 'Form 3 C' }, { id: 'Form3_D', display: 'Form 3 D' },
+            /* Form 4 */
+            { id: 'Form4_A', display: 'Form 4 A' }, { id: 'Form4_B', display: 'Form 4 B' }, { id: 'Form4_C', display: 'Form 4 C' }, { id: 'Form4_D', display: 'Form 4 D' },
+            /* Grade 10 */
             { id: 'Grade10_A', display: 'Grade 10 A' }, { id: 'Grade10_B', display: 'Grade 10 B' }, { id: 'Grade10_C', display: 'Grade 10 C' }, { id: 'Grade10_D', display: 'Grade 10 D' },
+            /* Grade 11 */
             { id: 'Grade11_A', display: 'Grade 11 A' }, { id: 'Grade11_B', display: 'Grade 11 B' }, { id: 'Grade11_C', display: 'Grade 11 C' }, { id: 'Grade11_D', display: 'Grade 11 D' },
+            /* Grade 12 */
             { id: 'Grade12_A', display: 'Grade 12 A' }, { id: 'Grade12_B', display: 'Grade 12 B' }, { id: 'Grade12_C', display: 'Grade 12 C' }, { id: 'Grade12_D', display: 'Grade 12 D' }
         ];
 
@@ -940,21 +950,39 @@
             }
         }
 
+        /* ============================================================
+           SELF-HEALING: ensure all 28 classes exist in the DB.
+           Adds only the missing ones — never touches existing rows.
+           ============================================================ */
         async function ensureClassesExist() {
             if (!supabaseClient || !isConnected) return;
             try {
-                const { count, error } = await supabaseClient
-                    .from('classes').select('*', { count:'exact', head:true });
-                if (error) { console.warn('Cannot count classes:', error.message); return; }
-                if (count && count > 0) return;
+                const { data: existing, error } = await supabaseClient
+                    .from('classes').select('grade, stream');
+                if (error) { console.warn('Cannot read classes:', error.message); return; }
 
-                const rows = CLASS_DEFINITIONS.map(c => {
-                    const parts = c.id.split('_');
-                    return { grade: parts[0], stream: parts[1], display_name: c.display };
-                });
-                const { error: insErr } = await supabaseClient.from('classes').insert(rows);
-                if (insErr) console.warn('Could not seed classes:', insErr.message);
-                else        console.log('✅ Seeded standard classes');
+                const existingKeys = new Set(
+                    (existing || []).map(c => `${(c.grade||'').trim()}|${(c.stream||'').trim()}`)
+                );
+
+                const toInsert = CLASS_DEFINITIONS
+                    .map(c => {
+                        const parts = c.id.split('_');
+                        return { grade: parts[0], stream: parts[1], display_name: c.display };
+                    })
+                    .filter(r => !existingKeys.has(`${r.grade}|${r.stream}`));
+
+                if (toInsert.length === 0) {
+                    console.log(`✅ All ${CLASS_DEFINITIONS.length} classes already present`);
+                    return;
+                }
+
+                const { error: insErr } = await supabaseClient.from('classes').insert(toInsert);
+                if (insErr) {
+                    console.warn('Could not insert missing classes:', insErr.message);
+                } else {
+                    console.log(`✅ Inserted ${toInsert.length} missing class(es):`, toInsert.map(r => r.display_name).join(', '));
+                }
             } catch (e) { console.error('ensureClassesExist error:', e); }
         }
 
