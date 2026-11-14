@@ -1,7 +1,45 @@
 <!DOCTYPE html>
 <html lang="en">
-  
 <head>
+
+ <style>
+  /* Prohibit text selection */
+  body {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+</style>
+
+<script>
+  // Prohibit right-click menu
+  document.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+  });
+
+  // Prohibit copy and cut
+  document.addEventListener('copy', function(e) {
+    e.preventDefault();
+  });
+  document.addEventListener('cut', function(e) {
+    e.preventDefault();
+  });
+
+  // Prohibit common shortcuts (Ctrl+C, Ctrl+U, Ctrl+S, F12, etc.)
+  document.addEventListener('keydown', function(e) {
+    // Ctrl+C / Ctrl+X / Ctrl+U / Ctrl+S
+    if ((e.ctrlKey || e.metaKey) && ['c','x','u','s'].includes(e.key.toLowerCase())) {
+      e.preventDefault();
+    }
+    // F12
+    if (e.key === 'F12') {
+      e.preventDefault();
+    }
+  });
+</script>
+
+  
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>Ipusukilo Secondary School</title>
