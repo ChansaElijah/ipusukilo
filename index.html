@@ -7,11 +7,8 @@
     <meta name="theme-color" content="#1a237e">
     <meta name="description" content="Ipusukilo Secondary School - Mfurila District, Zambia.">
 
-    <!-- Vercel Analytics -->
     <script>
-        try {
-            window.va = window.va || function() { (window.vaq = window.vaq || []).push(arguments); };
-        } catch (e) {}
+        try { window.va = window.va || function() { (window.vaq = window.vaq || []).push(arguments); }; } catch (e) {}
     </script>
     <script defer src="/_vercel/insights/script.js" onerror="console.log('Analytics not available')"></script>
 
@@ -23,28 +20,15 @@
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
         :root {
-            --paper: #F4F5F1;
-            --surface: #FFFFFF;
-            --ink: #15201A;
-            --ink-soft: #4B5A50;
-            --ink-faint: #8A968C;
-            --border: #DCE3DB;
-            --border-strong: #C3CDC1;
-            --gold: #B8862E;
-            --gold-dark: #8C6A22;
-            --gold-tint: #F6EDD9;
-            --marian-blue: #1a237e;
-            --marian-blue-light: #283593;
-            --marian-blue-tint: #E8EAF6;
-            --oxblood: #8C2F2F;
-            --oxblood-dark: #6E2222;
-            --font-display: 'Fraunces', serif;
-            --font-body: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            --paper: #F4F5F1; --surface: #FFFFFF; --ink: #15201A; --ink-soft: #4B5A50; --ink-faint: #8A968C;
+            --border: #DCE3DB; --border-strong: #C3CDC1;
+            --gold: #B8862E; --gold-dark: #8C6A22; --gold-tint: #F6EDD9;
+            --marian-blue: #1a237e; --marian-blue-light: #283593; --marian-blue-tint: #E8EAF6;
+            --oxblood: #8C2F2F; --oxblood-dark: #6E2222;
+            --font-display: 'Fraunces', serif; --font-body: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
             --font-mono: 'IBM Plex Mono', monospace;
             --radius-md: 16px;
-            --shadow-sm: 0 1px 2px rgba(21, 32, 26, 0.06);
-            --shadow-md: 0 8px 24px rgba(21, 32, 26, 0.09);
-            --shadow-lg: 0 24px 60px rgba(21, 32, 26, 0.18);
+            --shadow-sm: 0 1px 2px rgba(21, 32, 26, 0.06); --shadow-md: 0 8px 24px rgba(21, 32, 26, 0.09); --shadow-lg: 0 24px 60px rgba(21, 32, 26, 0.18);
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: var(--font-body); background: var(--paper); color: var(--ink); min-height: 100vh; line-height: 1.5; }
@@ -219,7 +203,7 @@
     <div class="topbar">
         <div class="brand">
             <div class="school-logo">
-                <img id="schoolLogoImg" src="coar_arm.png" alt="School Logo" onerror="this.style.display='none'">
+                <img id="schoolLogoImg" src="coat_arms.png" alt="School Logo" onerror="console.warn('Logo coat_arms.png not found'); this.style.opacity=0.3;">
             </div>
             <div class="ministry">Ministry of Education</div>
             <h1 id="schoolNameHeader">Ipusukilo Secondary School</h1>
@@ -231,7 +215,7 @@
         <div class="modal-content">
             <button class="close-btn" id="closeLoginModal">&times;</button>
             <div class="modal-header">
-                <div class="modal-logo"><img src="coat_arms.png" alt="logo" onerror="this.style.display='none'"></div>
+                <div class="modal-logo"><img src="coat_arms.png" alt="logo" onerror="console.warn('Logo coat_arms.png not found'); this.style.opacity=0.3;"></div>
                 <h2><i class="fas fa-user-circle" style="color:var(--gold);"></i> Sign In</h2>
                 <p>Select your role below</p>
             </div>
@@ -306,7 +290,7 @@
                     <div class="field"><label><i class="fas fa-calendar-alt"></i> Term</label><select id="studentTerm"><option value="">Select</option><option value="1">Term 1</option><option value="2">Term 2</option><option value="3">Term 3</option></select></div>
                 </div>
                 <div class="grid-2">
-                    <div class="field"><label><i class="fas fa-calendar-year"></i> Year</label><select id="studentYear"><option value="">Select</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option></select></div>
+                    <div class="field"><label><i class="fas fa-calendar-year"></i> Year</label><select id="studentYear"><option value="">Select</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option><option value="2028">2028</option><option value="2029">2029</option><option value="2039">2039</option></select></div>
                     <div class="field" style="justify-content:flex-end;"><button class="btn btn-primary btn-block" id="viewResultsBtn"><i class="fas fa-eye"></i> View Combined Report</button></div>
                 </div>
             </div>
@@ -338,7 +322,7 @@
                         <div class="field"><label><i class="fas fa-calendar-alt"></i> Term</label><select id="teacherTerm"><option value="">Select</option><option value="1">Term 1</option><option value="2">Term 2</option><option value="3">Term 3</option></select></div>
                     </div>
                     <div class="grid-3">
-                        <div class="field"><label><i class="fas fa-calendar-year"></i> Year</label><select id="teacherYear"><option value="">Select</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option></select></div>
+                        <div class="field"><label><i class="fas fa-calendar-year"></i> Year</label><select id="teacherYear"><option value="">Select</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option><option value="2028">2028</option><option value="2029">2029</option><option value="2039">2039</option></select></div>
                         <div class="field"><label><i class="fas fa-tag"></i> Test Type</label><select id="teacherTestType"><option value="">Select</option><option value="mid_term">Mid Term</option><option value="end_term">End of Term</option></select></div>
                         <div class="field" style="justify-content:flex-end;"><button class="btn btn-primary" id="loadStudentsBtn"><i class="fas fa-users"></i> Load Students</button></div>
                     </div>
@@ -354,7 +338,7 @@
                         <div class="field"><label><i class="fas fa-calendar-alt"></i> Term</label><select id="teacherImportTerm"><option value="">Select</option><option value="1">Term 1</option><option value="2">Term 2</option><option value="3">Term 3</option></select></div>
                     </div>
                     <div class="grid-3">
-                        <div class="field"><label><i class="fas fa-calendar-year"></i> Year</label><select id="teacherImportYear"><option value="">Select</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option></select></div>
+                        <div class="field"><label><i class="fas fa-calendar-year"></i> Year</label><select id="teacherImportYear"><option value="">Select</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option><option value="2028">2028</option><option value="2029">2029</option><option value="2039">2039</option></select></div>
                         <div class="field"><label><i class="fas fa-tag"></i> Test Type</label><select id="teacherImportTestType"><option value="">Select</option><option value="mid_term">Mid Term</option><option value="end_term">End of Term</option></select></div>
                         <div class="field" style="justify-content:flex-end;"><button class="btn btn-primary" id="teacherImportLoadBtn"><i class="fas fa-sync"></i> Load & Preview</button></div>
                     </div>
@@ -457,7 +441,7 @@
                         </div>
                         <div class="grid-3">
                             <div class="field"><label><i class="fas fa-calendar-alt"></i> Term</label><select id="analysisTermSelect"><option value="">Select</option><option value="1">Term 1</option><option value="2">Term 2</option><option value="3">Term 3</option></select></div>
-                            <div class="field"><label><i class="fas fa-calendar-year"></i> Year</label><select id="analysisYearSelect"><option value="">Select</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option></select></div>
+                            <div class="field"><label><i class="fas fa-calendar-year"></i> Year</label><select id="analysisYearSelect"><option value="">Select</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option><option value="2028">2028</option><option value="2029">2029</option><option value="2039">2039</option></select></div>
                             <div class="field" style="justify-content:flex-end;"><button class="btn btn-primary btn-block" id="generateAnalysisBtn"><i class="fas fa-chart-line"></i> Generate Analysis</button></div>
                         </div>
 
@@ -509,7 +493,7 @@
                     <div style="margin-top:16px;">
                         <div class="grid-3">
                             <div class="field"><label><i class="fas fa-graduation-cap"></i> Grade</label><select id="newClassGrade"><option value="">Select</option><option value="Form1">Form 1</option><option value="Form2">Form 2</option><option value="Grade10">Grade 10</option><option value="Grade11">Grade 11</option><option value="Grade12">Grade 12</option></select></div>
-                            <div class="field"><label><i class="fas fa-layer-group"></i> Stream</label><select id="newClassStream"><option value="">Select</option><option value="Green">Green</option><option value="Blue">Blue</option><option value="Red">Red</option></select></div>
+                            <div class="field"><label><i class="fas fa-layer-group"></i> Stream</label><select id="newClassStream"><option value="">Select</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select></div>
                         </div>
                         <button class="btn btn-success btn-block" id="addClassBtn"><i class="fas fa-plus"></i> Add Class</button>
                     </div>
@@ -530,11 +514,11 @@
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImluanZwYmFoZnFsdG96cnNxY21jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDM0MzIsImV4cCI6MjEwMzQ3OTQzMn0.JoGibO2fqrw7sbmBbQ55EUKONQl94cqPTmkqxNoiXXk';
 
         const CLASS_DEFINITIONS = [
-            { id: 'Form1_Red', display: 'Form 1 Red' }, { id: 'Form1_Blue', display: 'Form 1 Blue' }, { id: 'Form1_Green', display: 'Form 1 Green' },
-            { id: 'Form2_Red', display: 'Form 2 Red' }, { id: 'Form2_Blue', display: 'Form 2 Blue' }, { id: 'Form2_Green', display: 'Form 2 Green' },
-            { id: 'Grade10_Red', display: 'Grade 10 Red' }, { id: 'Grade10_Blue', display: 'Grade 10 Blue' }, { id: 'Grade10_Green', display: 'Grade 10 Green' },
-            { id: 'Grade11_Red', display: 'Grade 11 Red' }, { id: 'Grade11_Blue', display: 'Grade 11 Blue' }, { id: 'Grade11_Green', display: 'Grade 11 Green' },
-            { id: 'Grade12_Red', display: 'Grade 12 Red' }, { id: 'Grade12_Blue', display: 'Grade 12 Blue' }, { id: 'Grade12_Green', display: 'Grade 12 Green' }
+            { id: 'Form1_A', display: 'Form 1 A' }, { id: 'Form1_B', display: 'Form 1 B' }, { id: 'Form1_C', display: 'Form 1 C' }, { id: 'Form1_D', display: 'Form 1 D' },
+            { id: 'Form2_A', display: 'Form 2 A' }, { id: 'Form2_B', display: 'Form 2 B' }, { id: 'Form2_C', display: 'Form 2 C' }, { id: 'Form2_D', display: 'Form 2 D' },
+            { id: 'Grade10_A', display: 'Grade 10 A' }, { id: 'Grade10_B', display: 'Grade 10 B' }, { id: 'Grade10_C', display: 'Grade 10 C' }, { id: 'Grade10_D', display: 'Grade 10 D' },
+            { id: 'Grade11_A', display: 'Grade 11 A' }, { id: 'Grade11_B', display: 'Grade 11 B' }, { id: 'Grade11_C', display: 'Grade 11 C' }, { id: 'Grade11_D', display: 'Grade 11 D' },
+            { id: 'Grade12_A', display: 'Grade 12 A' }, { id: 'Grade12_B', display: 'Grade 12 B' }, { id: 'Grade12_C', display: 'Grade 12 C' }, { id: 'Grade12_D', display: 'Grade 12 D' }
         ];
 
         const SUBJECTS = ['English','Mathematics','Biology','Chemistry','Physics','History','Geography','Civic Education','Zambian Languages','Religious Education','Commerce','Principles of Accounts','Agricultural Science','ICT'];
@@ -549,7 +533,6 @@
         let CLASS_CACHE = {};
         let CLASS_LIST = [];
 
-        /* DOM refs */
         const toastDiv = document.getElementById('globalToast');
         const toastMsg = document.getElementById('toastMsg');
         const statusDot = document.getElementById('statusDot');
@@ -941,10 +924,6 @@
         }
         window.adminLogin = adminLogin;
 
-        /* ============================================================
-           Class data helpers
-           ============================================================ */
-
         function applyClassData(data) {
             CLASS_CACHE = {};
             CLASS_LIST = [];
@@ -1002,7 +981,6 @@
             return legacy ? legacy.display : key;
         }
 
-        /* FIXED: prefer real DB classes over legacy fallback IDs */
         function fillClassDropdown(drop, firstOption) {
             if (!drop) return;
             const currentValue = drop.value;
@@ -1398,10 +1376,6 @@
             } catch (err) { showToast('❌ Error: ' + err.message, true); console.error(err); }
         });
 
-        /* ============================================================
-           FIXED: Load Students for Teacher — matches students.class
-           regardless of whether it stores an integer id or a display name
-           ============================================================ */
         loadStudentsBtn.addEventListener('click', async function() {
             if (!currentUser || currentUser.role !== 'teacher') {
                 showToast('🔒 Teacher login required', true);
@@ -1423,7 +1397,6 @@
                 return;
             }
 
-            /* Build every value students.class might hold for this class */
             let classKey = String(classIdValue);
             let legacyDisplay = null;
             let legacyId = null;
@@ -1460,7 +1433,6 @@
                 if (error) throw error;
 
                 if (!students || students.length === 0) {
-                    /* Diagnostic: show which class values DO exist */
                     const { data: sample } = await supabaseClient
                         .from('students')
                         .select('class')
@@ -1630,7 +1602,6 @@
             try {
                 showToast('🔄 Generating analysis...');
 
-                /* Build candidate list for class filter (integer id or display name) */
                 let candidates = null;
                 if (classId) {
                     const display = getClassDisplay(classId);
@@ -1884,7 +1855,6 @@
             } catch (err) { showToast('❌ Error saving results: ' + err.message, true); console.error(err); }
         });
 
-        /* Bulk register */
         bulkImportArea.addEventListener('click', () => bulkFileInput.click());
         bulkImportArea.addEventListener('dragover', e => { e.preventDefault(); bulkImportArea.classList.add('dragover'); });
         bulkImportArea.addEventListener('dragleave', () => bulkImportArea.classList.remove('dragover'));
@@ -1986,7 +1956,6 @@
             showToast('📥 Template downloaded');
         });
 
-        /* Teacher Excel import */
         teacherImportArea.addEventListener('click', () => teacherFileInput.click());
         teacherImportArea.addEventListener('dragover', e => { e.preventDefault(); teacherImportArea.classList.add('dragover'); });
         teacherImportArea.addEventListener('dragleave', () => teacherImportArea.classList.remove('dragover'));
@@ -2053,7 +2022,6 @@
             try {
                 showToast('🔄 Importing results...');
 
-                /* Same candidate matching as Load Students */
                 const display = getClassDisplay(className);
                 const candidates = [String(className)];
                 if (display && display !== 'N/A') candidates.push(String(display));
@@ -2111,7 +2079,6 @@
             else showToast('⚠️ Please select an Excel file first', true);
         });
 
-        /* Tab switching */
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', function() {
                 document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -2133,7 +2100,6 @@
             });
         });
 
-        /* Student result search */
         viewResultsBtn.addEventListener('click', async function() {
             const rawNumber = studentNumber.value.trim();
             const term = studentTerm.value;
@@ -2281,7 +2247,6 @@
             printWindow.document.close();
         });
 
-        /* GO */
         initSupabase();
         setupAdminTabs();
 
