@@ -428,6 +428,28 @@
                                 <tbody id="studentsTableBody2"><tr><td colspan="5" style="text-align:center;color:var(--ink-faint);">Loading students...</td></tr></tbody></table>
                             </div>
                         </div>
+
+                        <!-- ===== CLEAR STUDENTS FROM CLASS ===== -->
+                        <div class="card" style="border-top-color: var(--oxblood); margin-top:16px;">
+                            <div class="card-header">
+                                <h2><i class="fas fa-trash-alt" style="color:var(--oxblood);"></i> Clear Students from Class</h2>
+                                <span class="subtitle">Remove all students from a selected class</span>
+                            </div>
+                            <div class="grid-2">
+                                <div class="field">
+                                    <label><i class="fas fa-users"></i> Select Class</label>
+                                    <select id="clearClassSelect">
+                                        <option value="">Select Class to Clear</option>
+                                    </select>
+                                </div>
+                                <div class="field" style="justify-content:flex-end;">
+                                    <button class="btn btn-danger btn-block" id="clearClassBtn">
+                                        <i class="fas fa-trash-alt"></i> Clear All Students in Class
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="clearClassStatus" style="margin-top:8px; font-size:13px; color:var(--ink-soft);"></div>
+                        </div>
                     </div>
 
                     <div id="analysisTab2" class="admin-tab-content">
@@ -646,6 +668,10 @@
         const analysisTable = document.getElementById('analysisTable');
         const analysisDownloadExcelBtn = document.getElementById('analysisDownloadExcelBtn');
         const analysisDownloadPdfBtn = document.getElementById('analysisDownloadPdfBtn');
+
+        const clearClassSelect = document.getElementById('clearClassSelect');
+        const clearClassBtn = document.getElementById('clearClassBtn');
+        const clearClassStatus = document.getElementById('clearClassStatus');
 
         const SCHOOL_CONFIG = {
             schools: {
@@ -931,6 +957,7 @@
                 populateBulkClassDropdown();
                 populateAdminDropdowns();
                 populateAnalysisClassDropdown();
+                populateClearClassDropdown();
                 loadAssignments();
                 loadStudents();
                 setupAdminTabs();
@@ -1074,6 +1101,114 @@
                 .catch(err => console.error('Error loading teachers:', err));
         }
 
+        /* ===== CLEAR STUDENTS FROM CLASS ===== */
+        function populateClearClassDropdown() {
+            if (!clearClassSelect) return;
+            const currentValue = clearClassSelect.value;
+            clearClassSelect.innerHTML = '<option value="">Select Class to Clear</option>';
+
+            const dbClasses = CLASS_LIST.filter(c => !String(c.id).includes('_'));
+            const legacyClasses = CLASS_LIST.filter(c => String(c.id).includes('_'));
+            const source = dbClasses.length > 0 ? dbClasses : legacyClasses;
+
+            source.forEach(c => {
+                const o = document.createElement('option');
+                o.value = String(c.id);
+                o.textContent = c.display;
+                clearClassSelect.appendChild(o);
+            });
+
+            if (currentValue) {
+                const exists = [...clearClassSelect.options].some(o => o.value === currentValue);
+                if (exists) clearClassSelect.value = currentValue;
+            }
+        }
+        window.populateClearClassDropdown = populateClearClassDropdown;
+
+        if (clearClassBtn) {
+            clearClassBtn.addEventListener('click', async function() {
+                if (!currentUser || currentUser.role !== 'admin') {
+                    showToast('🔒 Admin login required', true);
+                    return;
+                }
+
+                const classId = clearClassSelect.value;
+                if (!classId) { showToast('⚠️ Please select a class to clear', true); return; }
+                if (!supabaseClient || !isConnected) { showToast('⚠️ Database not connected', true); return; }
+
+                const classDisplay = getClassDisplay(classId);
+                const candidates = new Set();
+                candidates.add(String(classId));
+                if (classDisplay && classDisplay !== 'N/A') candidates.add(String(classDisplay));
+                const candidateList = [...candidates].filter(Boolean);
+
+                try {
+                    const { count, error: countErr } = await supabaseClient
+                        .from('students')
+                        .select('id', { count: 'exact', head: true })
+                        .in('class', candidateList);
+
+                    if (countErr) throw countErr;
+
+                    if (!count || count === 0) {
+                        showToast('ℹ️ No students found in this class', true);
+                        clearClassStatus.textContent = 'No students in this class.';
+                        return;
+                    }
+
+                    const confirmed = confirm(
+                        `⚠️ WARNING: This will permanently remove ALL ${count} student(s) from "${classDisplay}".\n\n` +
+                        `This action cannot be undone. Their results will also be deleted.\n\n` +
+                        `Are you sure you want to continue?`
+                    );
+                    if (!confirmed) { clearClassStatus.textContent = 'Cancelled.'; return; }
+
+                    clearClassBtn.disabled = true;
+                    clearClassBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Clearing...';
+                    clearClassStatus.textContent = 'Working...';
+
+                    const { data: studentsToDelete, error: fetchErr } = await supabaseClient
+                        .from('students')
+                        .select('id')
+                        .in('class', candidateList);
+
+                    if (fetchErr) throw fetchErr;
+
+                    const studentIds = (studentsToDelete || []).map(s => s.id);
+
+                    if (studentIds.length > 0) {
+                        const { error: resDelErr } = await supabaseClient
+                            .from('results')
+                            .delete()
+                            .in('student_id', studentIds);
+                        if (resDelErr) console.warn('Could not delete results:', resDelErr.message);
+                    }
+
+                    const { error: delErr } = await supabaseClient
+                        .from('students')
+                        .delete()
+                        .in('class', candidateList);
+
+                    if (delErr) throw delErr;
+
+                    clearClassStatus.textContent = `✅ Successfully removed ${count} student(s) from ${classDisplay}.`;
+                    showToast(`✅ Cleared ${count} student(s) from ${classDisplay}`);
+
+                    loadStudents();
+                    loadAdminStats();
+                    loadClasses();
+                    loadAssignments();
+                } catch (err) {
+                    console.error('Clear class error:', err);
+                    showToast('❌ Error: ' + err.message, true);
+                    clearClassStatus.textContent = 'Error: ' + err.message;
+                } finally {
+                    clearClassBtn.disabled = false;
+                    clearClassBtn.innerHTML = '<i class="fas fa-trash-alt"></i> Clear All Students in Class';
+                }
+            });
+        }
+
         function initSupabase() {
             try {
                 const savedSchool = localStorage.getItem('selectedSchool');
@@ -1124,6 +1259,7 @@
             populateImportClassDropdowns();
             populateAdminDropdowns();
             populateAnalysisClassDropdown();
+            populateClearClassDropdown();
             loadAssignments();
             loadStudents();
             updateLoginUI();
@@ -1162,6 +1298,7 @@
                 populateImportClassDropdowns();
                 populateBulkClassDropdown();
                 populateAnalysisClassDropdown();
+                populateClearClassDropdown();
                 fillClassDropdown(assignClassSelect2, 'Select Class');
 
                 if (!data || data.length === 0) {
@@ -1773,553 +1910,96 @@
 
             analysisTable.innerHTML = `<thead>${theadHtml}</thead><tbody>${tbodyHtml}</tbody>`;
             analysisResultsArea.style.display = 'block';
-            analysisDownloadExcelBtn.style.display = 'inline-flex';
-            analysisDownloadPdfBtn.style.display = 'inline-flex';
+
+            if (analysisDownloadExcelBtn) analysisDownloadExcelBtn.style.display = 'inline-flex';
+            if (analysisDownloadPdfBtn) analysisDownloadPdfBtn.style.display = 'inline-flex';
         }
 
-        if (generateAnalysisBtn) generateAnalysisBtn.addEventListener('click', generateAnalysisReport);
-
-        if (analysisDownloadExcelBtn) analysisDownloadExcelBtn.addEventListener('click', function() {
-            if (!currentAnalysisData) return;
-            const { rows, classId, subject, term, year, classAverage, highest, lowest, passRate } = currentAnalysisData;
-            const allSubjects = subject ? [subject] : [...new Set(rows.flatMap(r => Object.keys(r.subjectScores)))].sort();
-            const header = ['Rank','Name','Student Number'];
-            if (!classId) header.push('Class');
-            if (allSubjects.length > 1) { allSubjects.forEach(s => header.push(s)); header.push('Average','Grade'); }
-            else header.push('Score','Grade');
-
-            const aoa = [header];
-            rows.forEach(r => {
-                const row = [r.rank, r.name, r.number];
-                if (!classId) row.push(getClassDisplay(r.classId));
-                if (allSubjects.length > 1) {
-                    allSubjects.forEach(s => row.push(r.subjectScores[s] != null ? r.subjectScores[s] : ''));
-                    row.push(r.average, r.grade);
-                } else row.push(r.average, r.grade);
-                aoa.push(row);
-            });
-            aoa.push([]); aoa.push(['Class Average', classAverage]); aoa.push(['Highest', highest]);
-            aoa.push(['Lowest', lowest]); aoa.push(['Pass Rate (%)', passRate]);
-
-            const ws = XLSX.utils.aoa_to_sheet(aoa);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Analysis');
-            const classLabel = classId ? getClassDisplay(classId) : 'AllClasses';
-            XLSX.writeFile(wb, `Analysis_${classLabel.replace(/\s+/g,'_')}_${subject || 'AllSubjects'}_T${term}_${year}.xlsx`);
-            showToast('📥 Excel report downloaded');
-        });
-
-        if (analysisDownloadPdfBtn) analysisDownloadPdfBtn.addEventListener('click', function() {
-            if (!currentAnalysisData) return;
-            const printWindow = window.open('', '_blank', 'width=1000,height=700');
-            if (!printWindow) { showToast('⚠️ Please allow popups for this site', true); return; }
-            const school = getCurrentSchool();
-            printWindow.document.write(`
-                <html><head><title>Result Analysis Report</title>
-                <style>
-                    body { font-family: 'IBM Plex Sans', sans-serif; padding: 20px; }
-                    .report-header { text-align:center;margin-bottom:16px;border-bottom:2px solid #B8862E;padding-bottom:10px; }
-                    .report-header h1 { color:#1a237e;font-family:'Fraunces',serif; }
-                    .report-header .motto { color:#B8862E;font-style:italic; }
-                    .stats-row { display:flex;gap:12px;justify-content:center;margin-bottom:16px;flex-wrap:wrap; }
-                    .stats-row .stat-card { border:1px solid #ddd;border-radius:10px;padding:10px 16px;text-align:center;min-width:100px; }
-                    .stats-row .number { font-size:20px;font-weight:700;color:#1a237e; }
-                    .stats-row .label { font-size:10px;color:#8A968C;text-transform:uppercase; }
-                    table { width:100%;border-collapse:collapse;font-size:11px;margin-top:10px; }
-                    th { background:#1a237e;color:#fff;padding:5px 8px;text-align:left; }
-                    td { padding:5px 8px;border-bottom:1px solid #ddd; }
-                    .badge { display:inline-block;padding:2px 8px;border-radius:12px;font-size:9px;font-weight:600; }
-                    .badge-success{background:#e8f5e9;color:#2e7d32;} .badge-info{background:#e3f2fd;color:#0d47a1;}
-                    .badge-warning{background:#fff3e0;color:#e65100;} .badge-purple{background:#f3e5f5;color:#6a1b9a;}
-                    .badge-danger{background:#ffebee;color:#c62828;}
-                    .footer { text-align:center;margin-top:20px;font-size:10px;color:#8A968C;border-top:1px solid #ddd;padding-top:10px; }
-                </style></head><body>
-                <div class="report-header"><h1>${school.name}</h1><div class="motto">${school.motto}</div>
-                    <p style="font-size:12px;color:#4B5A50;">${school.location}</p></div>
-                <h3 style="text-align:center;color:#1a237e;">${analysisSummaryTitle.textContent}</h3>
-                <div class="stats-row">${analysisStatCards.innerHTML}</div>
-                <div class="table-wrapper">${analysisTable.outerHTML}</div>
-                <div class="footer">${school.name} · ${school.location} · Generated on ${new Date().toLocaleDateString()}</div>
-                <script>window.onload = function(){ window.print(); }<\/script>
-                </body></html>`);
-            printWindow.document.close();
-        });
-
-        saveResultsBtn.addEventListener('click', async function() {
-            if (!currentUser || currentUser.role !== 'teacher') { showToast('🔒 Teacher login required', true); return; }
-            const subject = teacherSubject.value;
-            const term = teacherTerm.value;
-            const year = teacherYear.value;
-            const testType = teacherTestType.value;
-
-            if (!subject || !term || !year || !testType) { showToast('⚠️ Please ensure all fields are selected', true); return; }
-            if (!supabaseClient || !isConnected) { showToast('⚠️ Database not connected', true); return; }
-
-            const rows = document.querySelectorAll('#resultsTableBody tr');
-            const results = [];
-            let hasError = false;
-
-            rows.forEach(row => {
-                const studentId = row.dataset.studentId;
-                const scoreInput = row.querySelector('.score-input');
-                const commentInput = row.querySelector('.comment-input');
-                const score = parseInt(scoreInput.value);
-                if (studentId && !isNaN(score) && score >= 0 && score <= 100) {
-                    results.push({ student_id: studentId, subject, term, year, test_type: testType,
-                                   score, comment: commentInput ? commentInput.value : '' });
-                } else if (studentId && scoreInput.value && (isNaN(score) || score < 0 || score > 100)) {
-                    hasError = true;
-                }
-            });
-
-            if (results.length === 0) { showToast('⚠️ No valid scores to save', true); return; }
-            if (hasError) { showToast('⚠️ Some scores are invalid (0-100 required)', true); return; }
-
-            try {
-                showToast('🔄 Saving results...');
-                for (const r of results) {
-                    const { data: existing } = await supabaseClient.from('results').select('id')
-                        .eq('student_id', r.student_id).eq('subject', r.subject)
-                        .eq('term', r.term).eq('year', r.year).eq('test_type', r.test_type).maybeSingle();
-
-                    if (existing) {
-                        await supabaseClient.from('results')
-                            .update({ score: r.score, comment: r.comment }).eq('id', existing.id);
-                    } else {
-                        await supabaseClient.from('results').insert(r);
-                    }
-                }
-                showToast('✅ All results saved successfully!');
-                loadAdminStats();
-            } catch (err) { showToast('❌ Error saving results: ' + err.message, true); console.error(err); }
-        });
-
-        bulkImportArea.addEventListener('click', () => bulkFileInput.click());
-        bulkImportArea.addEventListener('dragover', e => { e.preventDefault(); bulkImportArea.classList.add('dragover'); });
-        bulkImportArea.addEventListener('dragleave', () => bulkImportArea.classList.remove('dragover'));
-        bulkImportArea.addEventListener('drop', function(e) {
-            e.preventDefault(); bulkImportArea.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) { bulkFileInput.files = files; handleBulkFile(files[0]); }
-        });
-        bulkFileInput.addEventListener('change', function() { if (this.files.length > 0) handleBulkFile(this.files[0]); });
-
-        function handleBulkFile(file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type:'array' });
-                    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-                    if (!jsonData || jsonData.length === 0) { showToast('⚠️ No data found in file', true); return; }
-
-                    const headers = Object.keys(jsonData[0]);
-                    const required = ['Student Number','Name'];
-                    const missing = required.filter(r => !headers.some(h => h.toLowerCase() === r.toLowerCase()));
-                    if (missing.length > 0) { showToast(`⚠️ Missing columns: ${missing.join(', ')}`, true); return; }
-
-                    const normalized = jsonData.map(row => {
-                        const nk = headers.find(h => h.toLowerCase() === 'student number');
-                        const nmk = headers.find(h => h.toLowerCase() === 'name');
-                        return { student_number: String(row[nk] || '').trim(), name: String(row[nmk] || '').trim() };
-                    }).filter(d => d.student_number && d.name);
-
-                    if (normalized.length === 0) { showToast('⚠️ No valid rows found', true); return; }
-                    bulkData = normalized;
-                    showBulkPreview(normalized);
-                    bulkConfirmImportBtn.style.display = 'inline-flex';
-                    bulkClearPreviewBtn.style.display = 'inline-flex';
-                    showToast(`✅ Loaded ${normalized.length} students for bulk registration`);
-                } catch (err) { showToast('❌ Error reading file: ' + err.message, true); console.error(err); }
-            };
-            reader.readAsArrayBuffer(file);
-        }
-
-        function showBulkPreview(data) {
-            let html = `<table><thead><tr><th>#</th><th>Student Number</th><th>Name</th></tr></thead><tbody>`;
-            data.slice(0, 20).forEach((d, i) => { html += `<tr><td>${i+1}</td><td>${d.student_number}</td><td>${d.name}</td></tr>`; });
-            if (data.length > 20) html += `<tr><td colspan="3" style="text-align:center;color:var(--ink-faint);">... and ${data.length-20} more</td></tr>`;
-            html += `</tbody></table>`;
-            bulkImportPreview.innerHTML = html;
-            bulkImportPreview.style.display = 'block';
-            bulkImportStatus.textContent = `${data.length} students ready to register`;
-        }
-
-        bulkConfirmImportBtn.addEventListener('click', async function() {
-            if (!currentUser || currentUser.role !== 'admin') { showToast('🔒 Admin login required', true); return; }
-            if (!bulkData || bulkData.length === 0) { showToast('⚠️ No data to import', true); return; }
-            const className = bulkClassSelect.value;
-            if (!className) { showToast('⚠️ Please select a class', true); return; }
-            if (!supabaseClient || !isConnected) { showToast('⚠️ Database not connected', true); return; }
-
-            try {
-                showToast('🔄 Registering students...');
-                let added = 0, skipped = 0;
-                for (const student of bulkData) {
-                    const { data: existing } = await supabaseClient.from('students').select('id')
-                        .eq('student_number', student.student_number).maybeSingle();
-                    if (!existing) {
-                        await supabaseClient.from('students').insert({
-                            student_number: student.student_number, name: student.name, class: String(className)
-                        });
-                        added++;
-                    } else skipped++;
-                }
-                showToast(`✅ ${added} students registered, ${skipped} skipped (already exist)`);
-                bulkData = null;
-                bulkImportPreview.style.display = 'none'; bulkImportPreview.innerHTML = '';
-                bulkConfirmImportBtn.style.display = 'none'; bulkClearPreviewBtn.style.display = 'none';
-                bulkImportStatus.textContent = ''; bulkFileInput.value = '';
-                loadStudents(); loadAdminStats(); loadClasses();
-            } catch (err) { showToast('❌ Error: ' + err.message, true); console.error(err); }
-        });
-
-        bulkClearPreviewBtn.addEventListener('click', function() {
-            bulkData = null;
-            bulkImportPreview.style.display = 'none'; bulkImportPreview.innerHTML = '';
-            bulkConfirmImportBtn.style.display = 'none'; bulkClearPreviewBtn.style.display = 'none';
-            bulkImportStatus.textContent = ''; bulkFileInput.value = '';
-            showToast('Cleared');
-        });
-
-        bulkRegisterTemplateBtn.addEventListener('click', function() {
-            const wb = XLSX.utils.book_new();
-            const ws = XLSX.utils.aoa_to_sheet([
-                ['Student Number','Name'],
-                ['2024-001','Mary Mwansa'],
-                ['2024-002','Grace Banda'],
-                ['2024-003','Mercy Phiri']
-            ]);
-            XLSX.utils.book_append_sheet(wb, ws, 'Students');
-            XLSX.writeFile(wb, 'student_registration_template.xlsx');
-            showToast('📥 Template downloaded');
-        });
-
-        teacherImportArea.addEventListener('click', () => teacherFileInput.click());
-        teacherImportArea.addEventListener('dragover', e => { e.preventDefault(); teacherImportArea.classList.add('dragover'); });
-        teacherImportArea.addEventListener('dragleave', () => teacherImportArea.classList.remove('dragover'));
-        teacherImportArea.addEventListener('drop', function(e) {
-            e.preventDefault(); teacherImportArea.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) { teacherFileInput.files = files; handleTeacherImportFile(files[0]); }
-        });
-        teacherFileInput.addEventListener('change', function() { if (this.files.length > 0) handleTeacherImportFile(this.files[0]); });
-
-        function handleTeacherImportFile(file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type:'array' });
-                    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-                    if (!jsonData || jsonData.length === 0) { showToast('⚠️ No data found in file', true); return; }
-
-                    const headers = Object.keys(jsonData[0]);
-                    const required = ['Student Number','Score'];
-                    const missing = required.filter(r => !headers.some(h => h.toLowerCase() === r.toLowerCase()));
-                    if (missing.length > 0) { showToast(`⚠️ Missing columns: ${missing.join(', ')}`, true); return; }
-
-                    const normalized = jsonData.map(row => {
-                        const nk = headers.find(h => h.toLowerCase() === 'student number');
-                        const sk = headers.find(h => h.toLowerCase() === 'score');
-                        return { student_number: String(row[nk] || '').trim(), score: parseFloat(row[sk]) || 0 };
-                    }).filter(d => d.student_number && !isNaN(d.score) && d.score >= 0 && d.score <= 100);
-
-                    if (normalized.length === 0) { showToast('⚠️ No valid rows found (score must be 0-100)', true); return; }
-                    teacherImportData = normalized;
-                    showTeacherImportPreview(normalized);
-                    teacherImportBtn.style.display = 'inline-flex';
-                    teacherImportClearBtn.style.display = 'inline-flex';
-                    showToast(`✅ Loaded ${normalized.length} results for import`);
-                } catch (err) { showToast('❌ Error reading file: ' + err.message, true); console.error(err); }
-            };
-            reader.readAsArrayBuffer(file);
-        }
-
-        function showTeacherImportPreview(data) {
-            let html = `<table><thead><tr><th>#</th><th>Student Number</th><th>Score</th></tr></thead><tbody>`;
-            data.slice(0, 20).forEach((d, i) => { html += `<tr><td>${i+1}</td><td>${d.student_number}</td><td>${d.score}</td></tr>`; });
-            if (data.length > 20) html += `<tr><td colspan="3" style="text-align:center;color:var(--ink-faint);">... and ${data.length-20} more</td></tr>`;
-            html += `</tbody></table>`;
-            teacherImportPreview.innerHTML = html;
-            teacherImportPreview.style.display = 'block';
-            teacherImportStatus.textContent = `${data.length} results ready to import`;
-        }
-
-        teacherImportBtn.addEventListener('click', async function() {
-            if (!currentUser || currentUser.role !== 'teacher') { showToast('🔒 Teacher login required', true); return; }
-            const className = teacherImportClass.value;
-            const subject = teacherImportSubject.value;
-            const term = teacherImportTerm.value;
-            const year = teacherImportYear.value;
-            const testType = teacherImportTestType.value;
-
-            if (!className || !subject || !term || !year || !testType) { showToast('⚠️ Please select all fields', true); return; }
-            if (!teacherImportData || teacherImportData.length === 0) { showToast('⚠️ No data to import', true); return; }
-            if (!supabaseClient || !isConnected) { showToast('⚠️ Database not connected', true); return; }
-
-            try {
-                showToast('🔄 Importing results...');
-
-                const display = getClassDisplay(className);
-                const candidates = [String(className)];
-                if (display && display !== 'N/A') candidates.push(String(display));
-
-                const { data: students } = await supabaseClient.from('students')
-                    .select('id, student_number').in('class', candidates);
-                if (!students || students.length === 0) { showToast('⚠️ No students found in this class', true); return; }
-
-                const studentMap = {};
-                students.forEach(s => { studentMap[s.student_number] = s.id; });
-
-                let imported = 0, skipped = 0;
-                const toInsert = [];
-                for (const row of teacherImportData) {
-                    const studentId = studentMap[row.student_number];
-                    if (!studentId) { skipped++; continue; }
-
-                    const { data: existing } = await supabaseClient.from('results').select('id')
-                        .eq('student_id', studentId).eq('subject', subject)
-                        .eq('term', term).eq('year', year).eq('test_type', testType).maybeSingle();
-
-                    if (existing) {
-                        await supabaseClient.from('results').update({ score: row.score }).eq('id', existing.id);
-                    } else {
-                        toInsert.push({ student_id: studentId, subject, term, year, test_type: testType, score: row.score, comment: '' });
-                    }
-                    imported++;
-                }
-                if (toInsert.length > 0) await supabaseClient.from('results').insert(toInsert);
-                showToast(`✅ Imported ${imported} results (${skipped} skipped - student not in class)`);
-
-                teacherImportData = null;
-                teacherImportPreview.style.display = 'none'; teacherImportPreview.innerHTML = '';
-                teacherImportBtn.style.display = 'none'; teacherImportClearBtn.style.display = 'none';
-                teacherImportStatus.textContent = ''; teacherFileInput.value = '';
-                loadAdminStats();
-            } catch (err) { showToast('❌ Error: ' + err.message, true); console.error(err); }
-        });
-
-        teacherImportClearBtn.addEventListener('click', function() {
-            teacherImportData = null;
-            teacherImportPreview.style.display = 'none'; teacherImportPreview.innerHTML = '';
-            teacherImportBtn.style.display = 'none'; teacherImportClearBtn.style.display = 'none';
-            teacherImportStatus.textContent = ''; teacherFileInput.value = '';
-            showToast('Cleared');
-        });
-
-        teacherImportLoadBtn.addEventListener('click', function() {
-            if (teacherFileInput.files.length > 0) handleTeacherImportFile(teacherFileInput.files[0]);
-            else showToast('⚠️ Please select an Excel file first', true);
-        });
-
-        bulkRegisterBtn.addEventListener('click', function() {
-            if (bulkFileInput.files.length > 0) handleBulkFile(bulkFileInput.files[0]);
-            else showToast('⚠️ Please select an Excel file first', true);
-        });
-
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                const tab = this.dataset.tab;
-                document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-                const section = document.getElementById(tab + 'Section');
-                if (section) section.classList.add('active');
-                if (tab === 'admin' && currentUser && currentUser.role === 'admin') {
-                    loadAdminStats(); loadClasses(); loadAssignments(); loadStudents();
-                    populateAnalysisClassDropdown();
-                }
-                if (tab === 'teacher' && currentUser && currentUser.role === 'teacher') {
-                    teacherLocked.style.display = 'none';
-                    teacherContent.style.display = 'block';
-                    populateClassDropdowns();
-                    populateImportClassDropdowns();
-                }
-            });
-        });
-
+        /* ===== student results ===== */
         viewResultsBtn.addEventListener('click', async function() {
-            const rawNumber = studentNumber.value.trim();
+            const number = studentNumber.value.trim();
             const term = studentTerm.value;
             const year = studentYear.value;
 
-            if (!rawNumber) { showToast('⚠️ Please enter student number', true); return; }
+            if (!number) { showToast('⚠️ Please enter student number', true); return; }
             if (!term) { showToast('⚠️ Please select term', true); return; }
             if (!year) { showToast('⚠️ Please select year', true); return; }
             if (!supabaseClient || !isConnected) { showToast('⚠️ Database not connected', true); return; }
 
             try {
-                showToast('🔍 Searching...');
-                const { student, error } = await findStudentByNumber(rawNumber);
+                showToast('🔄 Looking up student...');
+                const { student, error } = await findStudentByNumber(number);
+                if (error && !student) { showToast('❌ ' + error.message, true); return; }
+                if (!student) { showToast('❌ Student not found: ' + number, true); return; }
 
-                if (error && !student) {
-                    console.error('Student search error:', error);
-                    showToast('❌ ' + error.message, true);
-                    studentResults.style.display = 'none'; return;
-                }
-                if (!student) {
-                    const { data: sample } = await supabaseClient.from('students').select('student_number, name').limit(5);
-                    const sampleStr = (sample && sample.length) ? sample.map(s => s.student_number).join(', ') : 'none found';
-                    showToast(`❌ Student "${rawNumber}" not found. Examples in DB: ${sampleStr}`, true);
-                    studentResults.style.display = 'none'; return;
-                }
+                const { data: results, error: rErr } = await supabaseClient
+                    .from('results')
+                    .select('*')
+                    .eq('student_id', student.id)
+                    .eq('term', term)
+                    .eq('year', year);
+
+                if (rErr) throw rErr;
 
                 studentInfo.innerHTML = renderStudentInfoCard(student, term, year);
-
-                const { data: results, error: rError } = await supabaseClient.from('results')
-                    .select('*').eq('student_id', student.id).eq('term', term).eq('year', year);
-                if (rError) throw rError;
-
-                if (!results || results.length === 0) {
-                    resultsContent.innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--ink-faint);">
-                        <i class="fas fa-info-circle" style="font-size:36px;display:block;margin-bottom:12px;"></i>
-                        <p>No results found for this student in Term ${term}, ${year}.</p></div>`;
-                    studentResults.style.display = 'block';
-                    showToast('ℹ️ No results found');
-                    return;
-                }
-
-                // Fetch all three tests
-                const test1Results = results.filter(r => r.test_type === 'test_1');
-                const midResults = results.filter(r => r.test_type === 'mid_test');
-                const endResults = results.filter(r => r.test_type === 'end_term_test');
-                
-                // Fallback for older records if the DB still uses 'mid_term'/'end_term'
-                results.forEach(r => {
-                    if (r.test_type === 'mid_term' && !midResults.find(x => x.subject === r.subject)) midResults.push(r);
-                    if (r.test_type === 'end_term' && !endResults.find(x => x.subject === r.subject)) endResults.push(r);
-                });
-
-                const classDisplay = getClassDisplay(student.class);
-
-                let html = `
-                    <div style="margin-bottom:12px;padding:10px 14px;background:var(--marian-blue-tint);border-radius:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                        <span style="font-weight:600;color:var(--marian-blue);"><i class="fas fa-users"></i> Class:</span>
-                        <span style="font-weight:700;color:var(--marian-blue);">${escapeHtml(classDisplay)}</span>
-                        <span style="color:var(--ink-faint);">|</span>
-                        <span style="font-weight:600;color:var(--marian-blue);"><i class="fas fa-calendar-alt"></i> Term ${escapeHtml(term)} · ${escapeHtml(year)}</span>
-                    </div>
-                    <div style="overflow-x:auto;margin-top:8px;">
-                        <table style="width:100%;border-collapse:collapse;font-size:13px;">
-                            <thead><tr style="background:var(--marian-blue);color:#fff;">
-                                <th style="padding:8px 12px;text-align:left;">Subject</th>
-                                <th style="padding:8px 12px;text-align:center;">Test 1</th>
-                                <th style="padding:8px 12px;text-align:center;">Grade</th>
-                                <th style="padding:8px 12px;text-align:center;">Mid Test</th>
-                                <th style="padding:8px 12px;text-align:center;">Grade</th>
-                                <th style="padding:8px 12px;text-align:center;">End Term</th>
-                                <th style="padding:8px 12px;text-align:center;">Grade</th>
-                                <th style="padding:8px 12px;text-align:center;">Combined</th>
-                                <th style="padding:8px 12px;text-align:center;">Grade</th>
-                            </tr></thead><tbody>`;
-
-                const subjects = [...new Set(results.map(r => r.subject))].sort();
-                subjects.forEach(sub => {
-                    const t1 = test1Results.find(r => r.subject === sub);
-                    const mid = midResults.find(r => r.subject === sub);
-                    const end = endResults.find(r => r.subject === sub);
-                    
-                    const t1Score = t1 ? t1.score : '-';
-                    const midScore = mid ? mid.score : '-';
-                    const endScore = end ? end.score : '-';
-                    
-                    const t1Grade = t1 ? getGrade(t1.score) : '-';
-                    const midGrade = mid ? getGrade(mid.score) : '-';
-                    const endGrade = end ? getGrade(end.score) : '-';
-                    
-                    let combined = '-', combinedGrade = '-';
-                    const validScores = [t1?.score, mid?.score, end?.score].filter(s => s !== undefined && s !== null);
-                    if (validScores.length > 0) {
-                        combined = Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length);
-                        combinedGrade = getGrade(combined);
-                    }
-
-                    html += `<tr style="border-bottom:1px solid var(--border);">
-                        <td style="padding:8px 12px;font-weight:600;">${escapeHtml(sub)}</td>
-                        
-                        <td style="padding:8px 12px;text-align:center;font-weight:600;">${t1Score}</td>
-                        <td style="padding:8px 12px;text-align:center;"><span class="badge ${t1 ? getGradeClass(t1.score) : 'badge-info'}">${t1Grade}</span></td>
-                        
-                        <td style="padding:8px 12px;text-align:center;font-weight:600;">${midScore}</td>
-                        <td style="padding:8px 12px;text-align:center;"><span class="badge ${mid ? getGradeClass(mid.score) : 'badge-info'}">${midGrade}</span></td>
-                        
-                        <td style="padding:8px 12px;text-align:center;font-weight:600;">${endScore}</td>
-                        <td style="padding:8px 12px;text-align:center;"><span class="badge ${end ? getGradeClass(end.score) : 'badge-info'}">${endGrade}</span></td>
-                        
-                        <td style="padding:8px 12px;text-align:center;font-weight:700;background:var(--gold-tint);">${combined}</td>
-                        <td style="padding:8px 12px;text-align:center;"><span class="badge ${combined !== '-' ? getGradeClass(combined) : 'badge-info'}">${combinedGrade}</span></td>
-                    </tr>`;
-                });
-
-                html += `</tbody></table></div>
-                    <div style="margin-top:12px;font-size:12px;color:var(--ink-faint);text-align:right;">
-                        <i class="fas fa-print"></i> Combined Report · Term ${escapeHtml(term)} · ${escapeHtml(year)}</div>
-                    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
-                        <span class="badge badge-success">A = 80-100%</span>
-                        <span class="badge badge-info">B = 70-79%</span>
-                        <span class="badge badge-warning">C = 60-69%</span>
-                        <span class="badge badge-purple">D = 50-59%</span>
-                        <span class="badge badge-danger">E = 0-49%</span>
-                    </div>`;
-
-                resultsContent.innerHTML = html;
+                renderStudentResults(student, results || [], term, year);
                 studentResults.style.display = 'block';
-                showToast('✅ Results loaded successfully');
-            } catch (err) { showToast('❌ Error: ' + err.message, true); console.error(err); }
+                showToast('✅ Results loaded');
+            } catch (err) {
+                showToast('❌ Error: ' + err.message, true);
+                console.error(err);
+            }
         });
 
-        downloadResultsBtn.addEventListener('click', function() {
-            const content = document.getElementById('resultsContent');
-            const info = document.getElementById('studentInfo');
-            if (!content || !info) return;
+        function renderStudentResults(student, results, term, year) {
+            if (!results || results.length === 0) {
+                resultsContent.innerHTML = `<div style="text-align:center;padding:30px;color:var(--ink-faint);">
+                    <i class="fas fa-inbox" style="font-size:36px;margin-bottom:10px;display:block;"></i>
+                    No results found for Term ${term} ${year}.
+                </div>`;
+                return;
+            }
 
-            const printWindow = window.open('', '_blank', 'width=800,height=600');
-            if (!printWindow) { showToast('⚠️ Please allow popups for this site', true); return; }
+            const subjectMap = {};
+            results.forEach(r => {
+                if (!subjectMap[r.subject]) subjectMap[r.subject] = {};
+                subjectMap[r.subject][r.test_type] = r;
+            });
 
-            const school = getCurrentSchool();
-            printWindow.document.write(`
-                <html><head><title>Student Report</title>
-                <style>
-                    body { font-family: 'IBM Plex Sans', sans-serif; padding: 20px; }
-                    .report-header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #B8862E; padding-bottom: 10px; }
-                    .report-header h1 { color: #1a237e; font-family: 'Fraunces', serif; }
-                    .report-header .motto { color: #B8862E; font-style: italic; }
-                    table { width: 100%; border-collapse: collapse; font-size: 12px; }
-                    th { background: #1a237e; color: #fff; padding: 6px 10px; text-align: left; }
-                    td { padding: 6px 10px; border-bottom: 1px solid #ddd; }
-                    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; }
-                    .badge-success { background: #e8f5e9; color: #2e7d32; }
-                    .badge-info { background: #e3f2fd; color: #0d47a1; }
-                    .badge-warning { background: #fff3e0; color: #e65100; }
-                    .badge-purple { background: #f3e5f5; color: #6a1b9a; }
-                    .badge-danger { background: #ffebee; color: #c62828; }
-                    .footer { text-align: center; margin-top: 20px; font-size: 10px; color: #8A968C; border-top: 1px solid #ddd; padding-top: 10px; }
-                    .student-info-box { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 16px; background: #f5f5f5; border-radius: 12px; margin-bottom: 12px; }
-                    .student-info-box .info-item { display: flex; flex-direction: column; gap: 2px; }
-                    .student-info-box .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #8A968C; font-weight: 600; }
-                    .student-info-box .value { font-size: 15px; color: #15201A; font-weight: 600; }
-                    .student-info-box .value.class-badge { display: inline-block; background: #E8EAF6; color: #1a237e; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; width: fit-content; }
-                </style></head><body>
-                <div class="report-header"><h1>${school.name}</h1><div class="motto">${school.motto}</div>
-                    <p style="font-size:12px;color:#4B5A50;">${school.location}</p></div>
-                <div>${info.innerHTML}</div>
-                <div>${content.innerHTML}</div>
-                <div class="footer">${school.name} · ${school.location} · Generated on ${new Date().toLocaleDateString()}</div>
-                <script>window.onload = function() { window.print(); }<\/script>
-                </body></html>`);
-            printWindow.document.close();
-        });
+            let html = `<div class="table-wrapper"><table>
+                <thead><tr><th>Subject</th><th>Test 1</th><th>Mid Test</th><th>End Term</th><th>Average</th><th>Grade</th><th>Comment</th></tr></thead><tbody>`;
 
+            Object.keys(subjectMap).sort().forEach(subj => {
+                const e = subjectMap[subj];
+                const t1 = e.test_1 ? e.test_1.score : '-';
+                const mt = e.mid_test ? e.mid_test.score : '-';
+                const et = e.end_term_test ? e.end_term_test.score : '-';
+                const scores = [e.test_1, e.mid_test, e.end_term_test].filter(x => x).map(x => x.score);
+                const avg = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
+                const grade = scores.length ? getGrade(avg) : '-';
+                const gradeClass = scores.length ? getGradeClass(avg) : '';
+                const comment = (e.end_term_test && e.end_term_test.comment) || (e.mid_test && e.mid_test.comment) || (e.test_1 && e.test_1.comment) || '';
+
+                html += `<tr>
+                    <td><strong>${escapeHtml(subj)}</strong></td>
+                    <td style="text-align:center;">${t1}</td>
+                    <td style="text-align:center;">${mt}</td>
+                    <td style="text-align:center;">${et}</td>
+                    <td style="text-align:center;font-weight:700;">${scores.length ? avg : '-'}</td>
+                    <td style="text-align:center;"><span class="badge ${gradeClass}">${grade}</span></td>
+                    <td style="font-size:12px;">${escapeHtml(comment)}</td>
+                </tr>`;
+            });
+
+            html += `</tbody></table></div>`;
+            resultsContent.innerHTML = html;
+        }
+
+        downloadResultsBtn.addEventListener('click', function() { window.print(); });
+
+        /* ===== bootstrap ===== */
         initSupabase();
-        setupAdminTabs();
-
-        console.log('🚀 Ipusukilo Secondary School App initialized');
-        console.log('📚 Supabase URL:', SUPABASE_URL);
-        console.log('🏫 Current School:', getCurrentSchool().name);
-
     })();
     </script>
-
 </body>
 </html>
